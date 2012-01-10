@@ -217,7 +217,7 @@ int tuxtruncate(struct inode *inode, loff_t size)
 	inode->i_size = size;
 	if (!is_expand) {
 		truncate_partial_block(inode, size);
-		/* FIXME: invalidate the truncated (dirty) buffers */
+		truncate_inode_pages(mapping(inode), size);
 		err = btree_chop(&inode->btree, index, MAX_TUXKEY + 1);
 	}
 	inode->i_mtime = inode->i_ctime = gettime();
