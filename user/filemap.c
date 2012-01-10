@@ -105,6 +105,9 @@ int filemap_extent_io(struct buffer_head *buffer, int write)
 
 	struct seg map[10];
 
+#ifdef ATOMIC
+	write = (write ? 2 : 0);
+#endif
 	int segs = map_region(inode, start, count, map, ARRAY_SIZE(map), write);
 	if (segs < 0)
 		return segs;
