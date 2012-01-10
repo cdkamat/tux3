@@ -505,7 +505,7 @@ void init_buffers(struct dev *dev, unsigned poolsize, int debug)
 int dev_blockio(struct buffer_head *buffer, int write)
 {
 	struct dev *dev = buffer->map->dev;
-	assert(dev->bits >= 8 && dev->fd);
+	assert(dev->bits >= 6 && dev->fd);
 	int err;
 #ifdef BUFFER_FOR_TUX3
 	err = blockio(write, buffer, buffer->index);
