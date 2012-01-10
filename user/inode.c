@@ -206,7 +206,7 @@ int tuxtruncate(struct inode *inode, loff_t size)
 {
 	/* FIXME: expanding size is not tested */
 	struct sb *sb = tux_sb(inode->i_sb);
-	block_t index = (size + sb->blockmask) >> sb->blockbits;
+	tuxkey_t index = (size + sb->blockmask) >> sb->blockbits;
 	int is_expand;
 	int err = 0;
 
@@ -218,7 +218,7 @@ int tuxtruncate(struct inode *inode, loff_t size)
 	if (!is_expand) {
 		truncate_partial_block(inode, size);
 		/* FIXME: invalidate the truncated (dirty) buffers */
-		err = btree_chop(&inode->btree, &(struct btree_chop_info){ .key = index }, 0);
+		err = btree_chop(&inode->btree, index, MAX_TUXKEY + 1);
 	}
 	inode->i_mtime = inode->i_ctime = gettime();
 	mark_inode_dirty(inode);
