@@ -350,7 +350,7 @@ static void test04(struct sb *sb, struct inode *inode)
 	/* probe same key with cursor2 */
 	struct cursor *cursor2 = alloc_cursor(btree, 0);
 	test_assert(!probe(cursor2, 1));
-	for (int i = 0; i < cursor->len; i++) {
+	for (int i = 0; i <= cursor->level; i++) {
 		test_assert(cursor->path[i].buffer == cursor2->path[i].buffer);
 		test_assert(cursor->path[i].next == cursor2->path[i].next);
 	}
@@ -398,17 +398,17 @@ static void test05(struct sb *sb, struct inode *inode)
 	assert(btree->root.depth >= 5);
 
 	test_assert(probe(cursor, 0) == 0);
-	orig = malloc(sizeof(*orig) * cursor->len);
-	memcpy(orig, cursor->path, sizeof(*orig) * cursor->len);
+	orig = malloc(sizeof(*orig) * (cursor->level + 1));
+	memcpy(orig, cursor->path, sizeof(*orig) * (cursor->level + 1));
 
 	if (test_start("test05.1")) {
 		/* Redirect full path */
-		for (int i = 0; i < cursor->len; i++) {
+		for (int i = 0; i <= cursor->level; i++) {
 			set_buffer_clean(orig[i].buffer);
 			orig[i].buffer->count++;
 		}
 		test_assert(cursor_redirect(cursor) == 0);
-		for (int i = 0; i < cursor->len; i++) {
+		for (int i = 0; i <= cursor->level; i++) {
 			struct path_level *at = &cursor->path[i];
 
 			/* Modify orignal buffer */
@@ -418,7 +418,7 @@ static void test05(struct sb *sb, struct inode *inode)
 			/* Redirected? */
 			test_assert(orig[i].buffer != at->buffer);
 			/* If not leaf, check ->next too */
-			if (i < cursor->len - 1)
+			if (i < cursor->level)
 				test_assert(orig[i].next != at->next);
 		}
 		release_cursor(cursor);
@@ -442,16 +442,16 @@ static void test05(struct sb *sb, struct inode *inode)
 
 	if (test_start("test05.2")) {
 		/* Redirect partial path */
-		for (int i = cursor->len / 2; i < cursor->len ; i++) {
+		for (int i = cursor->level / 2; i <= cursor->level ; i++) {
 			set_buffer_clean(orig[i].buffer);
 			orig[i].buffer->count++;
 		}
 		test_assert(cursor_redirect(cursor) == 0);
-		for (int i = 0; i < cursor->len; i++) {
+		for (int i = 0; i <= cursor->level; i++) {
 			struct path_level *at = &cursor->path[i];
 
 			/* Redirected? */
-			if (i < cursor->len / 2) {
+			if (i < cursor->level / 2) {
 				test_assert(orig[i].buffer == at->buffer);
 				test_assert(orig[i].next == at->next);
 				continue;
@@ -463,7 +463,7 @@ static void test05(struct sb *sb, struct inode *inode)
 
 			test_assert(orig[i].buffer != at->buffer);
 			/* If not leaf, check ->next too */
-			if (i < cursor->len - 1)
+			if (i < cursor->level)
 				test_assert(orig[i].next != at->next);
 		}
 		release_cursor(cursor);
