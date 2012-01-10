@@ -110,7 +110,8 @@ static void tux_update_entry(struct buffer_head *buffer, tux_dirent *entry, inum
 {
 	entry->inum = to_be_u64(inum);
 	entry->type = tux_type_by_mode[(mode & S_IFMT) >> STAT_SHIFT];
-	blockput_dirty(buffer);
+	mark_buffer_dirty_non(buffer);
+	blockput(buffer);
 }
 
 /*
@@ -130,7 +131,7 @@ void tux_update_dirent(struct buffer_head *buffer, tux_dirent *entry, struct ino
 loff_t tux_create_entry(struct inode *dir, const char *name, int len, inum_t inum, unsigned mode, loff_t *size)
 {
 	tux_dirent *entry;
-	struct buffer_head *buffer;
+	struct buffer_head *buffer, *clone;
 	unsigned reclen = TUX_REC_LEN(len), rec_len, name_len, offset;
 	unsigned blockbits = tux_sb(dir->i_sb)->blockbits, blocksize = 1 << blockbits;
 	unsigned blocks = *size >> blockbits, block;
@@ -165,6 +166,13 @@ loff_t tux_create_entry(struct inode *dir, const char *name, int len, inum_t inu
 	*entry = (tux_dirent){ .rec_len = tux_rec_len_to_disk(blocksize) };
 	*size += blocksize;
 create:
+	clone = blockdirty(buffer, tux_sb(dir->i_sb)->delta);
+	if (IS_ERR(clone)) {
+		blockput(buffer);
+		return PTR_ERR(clone);
+	}
+	entry = ptr_redirect(entry, bufdata(buffer), bufdata(clone));
+
 	if (!is_deleted(entry)) {
 		tux_dirent *newent = (tux_dirent *)((char *)entry + name_len);
 		newent->rec_len = tux_rec_len_to_disk(rec_len - name_len);
@@ -173,9 +181,9 @@ create:
 	}
 	entry->name_len = len;
 	memcpy(entry->name, name, len);
-	offset = (void *)entry - bufdata(buffer);
+	offset = (void *)entry - bufdata(clone);
 	/* this releases buffer */
-	tux_update_entry(buffer, entry, inum, mode);
+	tux_update_entry(clone, entry, inum, mode);
 
 	return (block << blockbits) + offset; /* only needed for xattr create */
 }
@@ -306,7 +314,9 @@ int tux_readdir(struct file *file, void *state, filldir_t filldir)
 
 int tux_delete_entry(struct buffer_head *buffer, tux_dirent *entry)
 {
+	struct inode *dir = buffer_inode(buffer);
 	tux_dirent *prev = NULL, *this = bufdata(buffer);
+	struct buffer_head *clone;
 
 	while ((char *)this < (char *)entry) {
 		if (this->rec_len == 0) {
@@ -317,13 +327,24 @@ int tux_delete_entry(struct buffer_head *buffer, tux_dirent *entry)
 		prev = this;
 		this = next_entry(this);
 	}
+
+	clone = blockdirty(buffer, tux_sb(dir->i_sb)->delta);
+	if (IS_ERR(clone)) {
+		blockput(buffer);
+		return PTR_ERR(clone);
+	}
+	entry = ptr_redirect(entry, bufdata(buffer), bufdata(clone));
+	prev = ptr_redirect(prev, bufdata(buffer), bufdata(clone));
+
 	if (prev)
 		prev->rec_len = tux_rec_len_to_disk((void *)entry +
 		tux_rec_len_from_disk(entry->rec_len) - (void *)prev);
 	memset(entry->name, 0, entry->name_len);
 	entry->name_len = entry->type = 0;
 	entry->inum = 0;
-	blockput_dirty(buffer);
+
+	mark_buffer_dirty_non(clone);
+	blockput(clone);
 
 	return 0;
 }
