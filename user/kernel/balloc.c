@@ -248,8 +248,13 @@ int replay_update_bitmap(struct sb *sb, block_t start, unsigned count, int set)
 		return -EINVAL;
 	}
 	(set ? set_bits : clear_bits)(bufdata(buffer), start & mask, count);
-	/* freeblocks are already written */
 	/* FIXME: maybe we should call blockdirty(); */
 	blockput_dirty(buffer);
+
+	if (set)
+		sb->freeblocks -= count;
+	else
+		sb->freeblocks += count;
+
 	return 0;
 }
