@@ -114,7 +114,7 @@ static void add_defer_alloc_inum(struct inode *inode)
 }
 
 /* must hold itable->btree.lock. FIXME: spinlock is enough? */
-static void del_defer_alloc_inum(struct inode *inode)
+void del_defer_alloc_inum(struct inode *inode)
 {
 	list_del_init(&tux_inode(inode)->alloc_list);
 }
